@@ -37,7 +37,7 @@ func SchemaDeclType(s *spec.Schema) *DeclType {
 	if len(s.Type) < 1 {
 		panic("no type")
 	}
-	// TODO: what about type params (from cel-policy-templates?
+	// TODO: what about type params (from cel-policy-templates?)
 	declType, found := openAPISchemaTypes[s.Type[0]]
 	if !found {
 		return NewObjectTypeRef("*error*")
@@ -47,7 +47,7 @@ func SchemaDeclType(s *spec.Schema) *DeclType {
 		if s.Items.Len() == 1 {
 			return NewListType(SchemaDeclType(s.Items.Schema))
 		}
-		// TODO: handle array
+		// TODO: handle len > 1 ?
 
 	case MapType.TypeName():
 		if s.AdditionalProperties != nil {

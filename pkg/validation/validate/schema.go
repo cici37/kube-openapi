@@ -88,10 +88,13 @@ func NewSchemaValidator(schema *spec.Schema, rootSchema interface{}, root string
 		s.commonValidator(),
 		s.objectValidator(),
 	}
+	if s.Options.validationRulesEnabled {
+		s.validators = append(s.validators, s.celExpressionValidator())
+	}
 	return &s
 }
 
-// SetPath sets the path for this schema valdiator
+// SetPath sets the path for this schema validator
 func (s *SchemaValidator) SetPath(path string) {
 	s.Path = path
 }
@@ -249,4 +252,15 @@ func (s *SchemaValidator) objectValidator() valueValidator {
 		KnownFormats:         s.KnownFormats,
 		Options:              s.Options,
 	}
+}
+
+func (s *SchemaValidator) celExpressionValidator() valueValidator {
+	rules := &CelRules{}
+	err := s.Schema.Extensions.GetObject("x-kubernetes-validator", rules)
+	if err != nil {
+		// The x-kubernetes-validator fields are validated at CRD registration time, so must be valid by the time they are used for validation
+		panic(fmt.Sprintf("Unexpected error accessing x-kubernetes-validator at %s: %v", err, s.Path))
+	}
+	validator := newCelExpressionValidator(s.Path, s.Schema, *rules)
+	return validator
 }

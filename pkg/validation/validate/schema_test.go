@@ -183,3 +183,144 @@ func TestSchemaValidator_EdgeCases(t *testing.T) {
 	r = s.Validate(j)
 	assert.False(t, r.IsValid())
 }
+
+func TestCelExpressionValidator(t *testing.T) {
+	schema := &spec.Schema{
+		SchemaProps: spec.SchemaProps{
+			Type: []string{"object"},
+			Properties: map[string]spec.Schema{
+				"spec": {
+					VendorExtensible: spec.VendorExtensible{
+						Extensions: map[string]interface{}{
+							"x-kubernetes-validator": []interface{}{
+								map[string]interface{}{
+									"rule": "minReplicas < maxReplicas",
+								},
+							},
+						},
+					},
+					SchemaProps: spec.SchemaProps{
+						Type: []string{"object"},
+						Properties: map[string]spec.Schema{
+							"minReplicas": {
+								SchemaProps: spec.SchemaProps{
+									Type:   []string{"integer"},
+									Format: "int64",
+								},
+							},
+							"maxReplicas": {
+								SchemaProps: spec.SchemaProps{
+									Type:   []string{"integer"},
+									Format: "int64",
+								},
+							},
+							"nestedObj": {
+								VendorExtensible: spec.VendorExtensible{
+									Extensions: map[string]interface{}{
+										"x-kubernetes-validator": []interface{}{
+											map[string]interface{}{
+												"rule":    "val < 10",
+												"message": "val is a bit too big",
+											},
+											map[string]interface{}{
+												"rule":    "val < 1000",
+												"message": "val is way too big",
+											},
+										},
+									},
+								},
+								SchemaProps: spec.SchemaProps{
+									Type: []string{"object"},
+									Properties: map[string]spec.Schema{
+										"val": {
+											SchemaProps: spec.SchemaProps{
+												Type:   []string{"integer"},
+												Format: "int64",
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	cases := []struct {
+		name         string
+		input        map[string]interface{}
+		expectErrors []string
+	}{
+		{
+			name: "valid",
+			input: map[string]interface{}{
+				"spec": map[string]interface{}{
+					"minReplicas": int64(5),
+					"maxReplicas": int64(10),
+				},
+			},
+		},
+		{
+			name: "valid nested",
+			input: map[string]interface{}{
+				"spec": map[string]interface{}{
+					"minReplicas": int64(1),
+					"maxReplicas": int64(2),
+					"nestedObj": map[string]interface{}{
+						"val": int64(5),
+					},
+				},
+			},
+		},
+		{
+			name: "invalid",
+			input: map[string]interface{}{
+				"spec": map[string]interface{}{
+					"minReplicas": int64(11),
+					"maxReplicas": int64(10),
+				},
+			},
+			expectErrors: []string{
+				"spec failed validator rule 'minReplicas < maxReplicas'",
+			},
+		},
+		{
+			name: "valid nested",
+			input: map[string]interface{}{
+				"spec": map[string]interface{}{
+					"minReplicas": int64(1),
+					"maxReplicas": int64(2),
+					"nestedObj": map[string]interface{}{
+						"val": int64(10000),
+					},
+				},
+			},
+			expectErrors: []string{
+				"spec.nestedObj: val is a bit too big",
+				"spec.nestedObj: val is way too big",
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			validator := NewSchemaValidator(schema, nil, "", strfmt.Default, ValidationRulesEnabled)
+			r := validator.Validate(tc.input)
+
+			actualErrors := map[string]struct{}{}
+			for _, e := range r.Errors {
+				actualErrors[e.Error()] = struct{}{}
+			}
+			for _, e := range tc.expectErrors {
+				assert.Contains(t, actualErrors, e, "Expected errors to contain: %v", e)
+				delete(actualErrors, e)
+			}
+			for e := range actualErrors {
+				assert.Failf(t, "Unexpected error", "Did not expect errors to contain: %v", e)
+			}
+			assert.Equal(t, len(tc.expectErrors) == 0, r.IsValid())
+		})
+	}
+}

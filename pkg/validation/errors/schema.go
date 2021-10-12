@@ -64,6 +64,9 @@ const (
 	failedAllPatternProps     = "%s.%s in %s failed all pattern properties"
 	failedAllPatternPropsNoIn = "%s.%s failed all pattern properties"
 	multipleOfMustBePositive  = "factor MultipleOf declared for %s must be positive: %v"
+	validatorRuleFail         = "%s failed validator rule '%s'"
+	validatorRuleFailWithMsg  = "%s: %s"
+	validationRuleExecError   = "%s failed to execute validator rule '%s' due to error: %v"
 )
 
 // All code responses can be used to differentiate errors for different handling
@@ -91,6 +94,8 @@ const (
 	UnallowedPropertyCode
 	FailedAllPatternPropsCode
 	MultipleOfMustBePositiveCode
+	ValidatorRuleFailCode
+	ValidatorRuleExecutionErrorCode
 )
 
 // CompositeError is an error that groups several errors together
@@ -563,5 +568,37 @@ func MultipleOfMustBePositive(name, in string, factor interface{}) *Validation {
 		In:      in,
 		Value:   factor,
 		message: fmt.Sprintf(multipleOfMustBePositive, name, factor),
+	}
+}
+
+// FailedValidatorRule error for when a value fails a x-kubernetes-validator rule.
+func FailedValidatorRule(name, in, rule, message string, value interface{}) *Validation {
+	var msg string
+	if message != "" {
+		// If x-kubernetes-validator rule provided a custom message, use it.
+		msg = fmt.Sprintf(validatorRuleFailWithMsg, name, message)
+	} else {
+		msg = fmt.Sprintf(validatorRuleFail, name, rule)
+	}
+
+	return &Validation{
+		code:    ValidatorRuleFailCode,
+		Name:    name,
+		In:      in,
+		Value:   value,
+		message: msg,
+	}
+}
+
+// ErrorExecutingValidatorRule error for when execution of a x-kubernetes-validator rule results in an error.
+func ErrorExecutingValidatorRule(name, in, rule string, err error, value interface{}) *Validation {
+	var msg = fmt.Sprintf(validationRuleExecError, name, rule, err)
+
+	return &Validation{
+		code:    ValidatorRuleExecutionErrorCode,
+		Name:    name,
+		In:      in,
+		Value:   value,
+		message: msg,
 	}
 }
