@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/checker/decls"
-	celext "github.com/google/cel-go/ext"
 	expr "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 	celmodel "k8s.io/kube-openapi/third_party/forked/celopenapi/model"
@@ -35,71 +34,39 @@ type CelRule struct {
 	Message string `json:"message"`
 }
 
-// Compile is used for cel compilation.
-// rootName is used as type name of provided schema
-func Compile(schema *spec.Schema, CelRules CelRules, rootName string) ([]cel.Program, []error) {
-	if len(rootName) == 0 {
-		rootName = "self"
-	}
+// Compile compiles all the CEL validation rules in the CelRules and returns a slice containing a compiled program for each provided CelRule, or an array of errors.
+func Compile(schema *spec.Schema, celRules CelRules) ([]cel.Program, []error) {
+	var scopedTypeName = "self"
 	var allErrors []error
 	var propDecls []*expr.Decl
+	var root *celmodel.DeclType
+	var ok bool
 	env, _ := cel.NewEnv()
-	if schema.Type.Contains("string") || schema.Type.Contains("integer") || schema.Type.Contains("boolean") || schema.Type.Contains("number") {
-		switch schema.Type[0] {
-		case "string":
-			propDecls = append(propDecls, decls.NewVar(rootName, decls.String))
-		case "integer":
-			propDecls = append(propDecls, decls.NewVar(rootName, decls.Int))
-		case "boolean":
-			propDecls = append(propDecls, decls.NewVar(rootName, decls.Bool))
-		case "number":
-			propDecls = append(propDecls, decls.NewVar(rootName, decls.Double))
-		default:
-			allErrors = append(allErrors, fmt.Errorf("not supported for type: %v", schema.Type[0]))
-			return nil, allErrors
-		}
-		var err error
-		env, err = cel.NewEnv(
-			celext.Strings(),
-			celext.Encoders(),
-			cel.Declarations(propDecls...))
-		if err != nil {
-			allErrors = append(allErrors, fmt.Errorf("error initializing CEL environment: %w", err))
-			return nil, allErrors
-		}
-	} else {
-		reg := celmodel.NewRegistry(env)
-		rt, err := celmodel.NewRuleTypes(rootName, schema, reg)
-		if err != nil {
-			allErrors = append(allErrors, err)
-			return nil, allErrors
-		}
-		opts, err := rt.EnvOptions(env.TypeProvider())
-		if err != nil {
-			allErrors = append(allErrors, err)
-			return nil, allErrors
-		}
-
-		if root, ok := rt.FindDeclType(rootName); ok {
-			if root.IsObject() {
-				for k, f := range root.Fields {
-					propDecls = append(propDecls, decls.NewVar(k, f.Type.ExprType()))
-				}
-			}
-		} else {
-			allErrors = append(allErrors, fmt.Errorf("unsupported type"))
-			return nil, allErrors
-		}
-		opts = append(opts, cel.Declarations(propDecls...))
-		env, err = env.Extend(opts...)
-		if err != nil {
-			allErrors = append(allErrors, err)
-			return nil, allErrors
+	reg := celmodel.NewRegistry(env)
+	rt, err := celmodel.NewRuleTypes(scopedTypeName, schema, reg)
+	if err != nil {
+		allErrors = append(allErrors, err)
+		return nil, allErrors
+	}
+	opts, err := rt.EnvOptions(env.TypeProvider())
+	root, ok = rt.FindDeclType(scopedTypeName)
+	if !ok {
+		root = celmodel.SchemaDeclType(schema).MaybeAssignTypeName(scopedTypeName)
+	}
+	if root.IsObject() {
+		for k, f := range root.Fields {
+			propDecls = append(propDecls, decls.NewVar(k, f.Type.ExprType()))
 		}
 	}
-
-	programs := make([]cel.Program, len(CelRules))
-	for i, rule := range CelRules {
+	propDecls = append(propDecls, decls.NewVar(scopedTypeName, root.ExprType()))
+	opts = append(opts, cel.Declarations(propDecls...))
+	env, err = env.Extend(opts...)
+	if err != nil {
+		allErrors = append(allErrors, err)
+		return nil, allErrors
+	}
+	programs := make([]cel.Program, len(celRules))
+	for i, rule := range celRules {
 		ast, issues := env.Compile(rule.Rule)
 		if issues != nil {
 			allErrors = append(allErrors, fmt.Errorf("compilation failed for rule: %v with message: %v", rule.Message, issues.Err()))

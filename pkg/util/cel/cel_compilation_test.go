@@ -230,7 +230,7 @@ func TestCelCompilation(t *testing.T) {
 
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
-			_, allErrors := Compile(&tt.input, []CelRule{{Rule: tt.expr}}, "")
+			_, allErrors := Compile(&tt.input, []CelRule{{Rule: tt.expr}})
 			if !tt.wantError && len(allErrors) > 0 {
 				t.Errorf("Expected no error, but got: %v", allErrors)
 			} else if tt.wantError && len(allErrors) == 0 {
