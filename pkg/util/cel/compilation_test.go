@@ -17,7 +17,6 @@ limitations under the License.
 package cel
 
 import (
-	"fmt"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 	"strings"
 	"testing"
@@ -25,12 +24,11 @@ import (
 
 func TestCelCompilation(t *testing.T) {
 	cases := []struct {
-		name              string
-		input             spec.Schema
-		expr              string
-		errMessage        string
-		wantError         bool
-		checkErrorMessage bool
+		name               string
+		input              spec.Schema
+		wantError          bool
+		checkErrorMessage  bool
+		expectedErrMessage string
 	}{
 		{
 			name: "valid object",
@@ -50,9 +48,17 @@ func TestCelCompilation(t *testing.T) {
 						},
 					},
 				},
+				VendorExtensible: spec.VendorExtensible{
+					Extensions: spec.Extensions{
+						"x-kubernetes-validator": []spec.CELValidationRule{
+							{
+								Rule:    "minReplicas < maxReplicas",
+								Message: "minReplicas should be smaller than maxReplicas",
+							},
+						},
+					},
+				},
 			},
-			expr:              "minReplicas < maxReplicas",
-			errMessage:        "minReplicas should be smaller than maxReplicas",
 			wantError:         false,
 			checkErrorMessage: false,
 		},
@@ -62,9 +68,17 @@ func TestCelCompilation(t *testing.T) {
 				SchemaProps: spec.SchemaProps{
 					Type: []string{"string"},
 				},
+				VendorExtensible: spec.VendorExtensible{
+					Extensions: spec.Extensions{
+						"x-kubernetes-validator": []spec.CELValidationRule{
+							{
+								Rule:    "self.startsWith('s')",
+								Message: "scoped field should start with 's'",
+							},
+						},
+					},
+				},
 			},
-			expr:              "self.startsWith('s')",
-			errMessage:        "scoped field should start with 's'",
 			wantError:         false,
 			checkErrorMessage: false,
 		},
@@ -75,9 +89,17 @@ func TestCelCompilation(t *testing.T) {
 					Type:   []string{"string"},
 					Format: "byte",
 				},
+				VendorExtensible: spec.VendorExtensible{
+					Extensions: spec.Extensions{
+						"x-kubernetes-validator": []spec.CELValidationRule{
+							{
+								Rule:    "string(self).endsWith('s')",
+								Message: "scoped field should end with 's'",
+							},
+						},
+					},
+				},
 			},
-			expr:              "string(self).endsWith('s')",
-			errMessage:        "scoped field should end with 's'",
 			wantError:         false,
 			checkErrorMessage: false,
 		},
@@ -87,9 +109,17 @@ func TestCelCompilation(t *testing.T) {
 				SchemaProps: spec.SchemaProps{
 					Type: []string{"boolean"},
 				},
+				VendorExtensible: spec.VendorExtensible{
+					Extensions: spec.Extensions{
+						"x-kubernetes-validator": []spec.CELValidationRule{
+							{
+								Rule:    "self == true",
+								Message: "scoped field should be true",
+							},
+						},
+					},
+				},
 			},
-			expr:              "self == true",
-			errMessage:        "scoped field should be true",
 			wantError:         false,
 			checkErrorMessage: false,
 		},
@@ -99,9 +129,17 @@ func TestCelCompilation(t *testing.T) {
 				SchemaProps: spec.SchemaProps{
 					Type: []string{"integer"},
 				},
+				VendorExtensible: spec.VendorExtensible{
+					Extensions: spec.Extensions{
+						"x-kubernetes-validator": []spec.CELValidationRule{
+							{
+								Rule:    "self > 0",
+								Message: "scoped field should be greater than 0",
+							},
+						},
+					},
+				},
 			},
-			expr:              "self > 0",
-			errMessage:        "scoped field should be greater than 0",
 			wantError:         false,
 			checkErrorMessage: false,
 		},
@@ -111,9 +149,17 @@ func TestCelCompilation(t *testing.T) {
 				SchemaProps: spec.SchemaProps{
 					Type: []string{"number"},
 				},
+				VendorExtensible: spec.VendorExtensible{
+					Extensions: spec.Extensions{
+						"x-kubernetes-validator": []spec.CELValidationRule{
+							{
+								Rule:    "self > 1.0",
+								Message: "scoped field should be greater than 1.0",
+							},
+						},
+					},
+				},
 			},
-			expr:              "self > 1.0",
-			errMessage:        "scoped field should be greater than 1.0",
 			wantError:         false,
 			checkErrorMessage: false,
 		},
@@ -138,9 +184,17 @@ func TestCelCompilation(t *testing.T) {
 						},
 					},
 				},
+				VendorExtensible: spec.VendorExtensible{
+					Extensions: spec.Extensions{
+						"x-kubernetes-validator": []spec.CELValidationRule{
+							{
+								Rule:    "nestedObj.val == 10",
+								Message: "val should be equal to 10",
+							},
+						},
+					},
+				},
 			},
-			expr:              "nestedObj.val == 10",
-			errMessage:        "val should be equal to 10",
 			wantError:         false,
 			checkErrorMessage: false,
 		},
@@ -171,9 +225,17 @@ func TestCelCompilation(t *testing.T) {
 						},
 					},
 				},
+				VendorExtensible: spec.VendorExtensible{
+					Extensions: spec.Extensions{
+						"x-kubernetes-validator": []spec.CELValidationRule{
+							{
+								Rule:    "size(self.nestedObj[0]) == 10",
+								Message: "size of first element in nestedObj should be equal to 10",
+							},
+						},
+					},
+				},
 			},
-			expr:              "size(self.nestedObj[0]) == 10",
-			errMessage:        "size of first element in nestedObj should be equal to 10",
 			wantError:         false,
 			checkErrorMessage: false,
 		},
@@ -204,9 +266,17 @@ func TestCelCompilation(t *testing.T) {
 						},
 					},
 				},
+				VendorExtensible: spec.VendorExtensible{
+					Extensions: spec.Extensions{
+						"x-kubernetes-validator": []spec.CELValidationRule{
+							{
+								Rule:    "size(self[0][0]) == 10",
+								Message: "size of items under items of scoped field should be equal to 10",
+							},
+						},
+					},
+				},
 			},
-			expr:              "size(self[0][0]) == 10",
-			errMessage:        "size of items under items of scoped field should be equal to 10",
 			wantError:         false,
 			checkErrorMessage: false,
 		},
@@ -238,9 +308,17 @@ func TestCelCompilation(t *testing.T) {
 						},
 					},
 				},
+				VendorExtensible: spec.VendorExtensible{
+					Extensions: spec.Extensions{
+						"x-kubernetes-validator": []spec.CELValidationRule{
+							{
+								Rule:    "self[0].nestedObj.val == 10",
+								Message: "val under nestedObj under properties under items should be equal to 10",
+							},
+						},
+					},
+				},
 			},
-			expr:              "self[0].nestedObj.val == 10",
-			errMessage:        "val under nestedObj under properties under items should be equal to 10",
 			wantError:         false,
 			checkErrorMessage: false,
 		},
@@ -259,9 +337,17 @@ func TestCelCompilation(t *testing.T) {
 						},
 					},
 				},
+				VendorExtensible: spec.VendorExtensible{
+					Extensions: spec.Extensions{
+						"x-kubernetes-validator": []spec.CELValidationRule{
+							{
+								Rule:    "size(self) > 0",
+								Message: "size of scoped field should be greater than 0",
+							},
+						},
+					},
+				},
 			},
-			expr:              "size(self) > 0",
-			errMessage:        "size of scoped field should be greater than 0",
 			wantError:         false,
 			checkErrorMessage: false,
 		},
@@ -271,26 +357,56 @@ func TestCelCompilation(t *testing.T) {
 				SchemaProps: spec.SchemaProps{
 					Type: []string{"number"},
 				},
+				VendorExtensible: spec.VendorExtensible{
+					Extensions: spec.Extensions{
+						"x-kubernetes-validator": []spec.CELValidationRule{
+							{
+								Rule:    "size(self) == 10",
+								Message: "size of scoped field should be equal to 10",
+							},
+						},
+					},
+				},
 			},
-			expr:              "size(self) == 10",
-			errMessage:        "size of scoped field should be equal to 10",
-			wantError:         true,
-			checkErrorMessage: true,
+			wantError:          true,
+			checkErrorMessage:  true,
+			expectedErrMessage: "size of scoped field should be equal to 10",
+		},
+		{
+			name: "invalid checking for number",
+			input: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Type: []string{"integer"},
+				},
+				VendorExtensible: spec.VendorExtensible{
+					Extensions: spec.Extensions{
+						"x-kubernetes-validator": []spec.CELValidationRule{
+							{
+								Rule:    "size(self) == 10",
+								Message: "size of scoped field should be equal to 10",
+							},
+						},
+					},
+				},
+			},
+			wantError:          true,
+			checkErrorMessage:  true,
+			expectedErrMessage: "compilation failed for rule",
 		},
 	}
 
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
-			_, allErrors := Compile(&tt.input, []CelRule{{Rule: tt.expr, Message: tt.errMessage}})
+			_, allErrors := Compile(&tt.input)
 			if tt.checkErrorMessage {
 				var pass = false
 				for _, err := range allErrors {
-					if strings.Contains(fmt.Sprint(err), tt.errMessage) {
+					if strings.Contains(err.Error(), tt.expectedErrMessage) {
 						pass = true
 					}
 				}
 				if !pass {
-					t.Errorf("Expected error massage contains: %v, but got error: %v", tt.errMessage, allErrors)
+					t.Errorf("Expected error massage contains: %v, but got error: %v", tt.expectedErrMessage, allErrors)
 				}
 			} else {
 				if !tt.wantError && len(allErrors) > 0 {

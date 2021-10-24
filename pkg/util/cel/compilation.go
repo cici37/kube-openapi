@@ -25,40 +25,48 @@ import (
 	celmodel "k8s.io/kube-openapi/third_party/forked/celopenapi/model"
 )
 
-// CelRules defines the format of the x-kubernetes-validator schema extension.
-type CelRules []CelRule
+// ScopedTypeName is the placeholder type name used for the type of ScopedVarName if it is an object type.
+// TODO: provide a unique name that is based on the Kubernetes kind + path to nested schema?
+const ScopedTypeName = "SelfSchemaType.expressionlanguage.k8s.io"
 
-// CelRule defines the format of each rule in CelRules.
-type CelRule struct {
-	Rule    string `json:"rule"`
-	Message string `json:"message"`
-}
+// ScopedVarName is the variable name assigned to the locally scoped data element of a CEL rule.
+const ScopedVarName = "self"
 
 // Compile compiles all the CEL validation rules in the CelRules and returns a slice containing a compiled program for each provided CelRule, or an array of errors.
-func Compile(schema *spec.Schema, celRules CelRules) ([]cel.Program, []error) {
-	var scopedTypeName = "self"
+func Compile(schema *spec.Schema) ([]cel.Program, []error) {
 	var allErrors []error
+	celRules, hasRule := schema.Extensions.GetValidationRules("x-kubernetes-validator")
+	if !hasRule {
+		allErrors = append(allErrors, fmt.Errorf("no validation rule passed"))
+		return nil, allErrors
+	}
+
 	var propDecls []*expr.Decl
 	var root *celmodel.DeclType
 	var ok bool
 	env, _ := cel.NewEnv()
 	reg := celmodel.NewRegistry(env)
-	rt, err := celmodel.NewRuleTypes(scopedTypeName, schema, reg)
+	rt, err := celmodel.NewRuleTypes(ScopedTypeName, schema, reg)
 	if err != nil {
 		allErrors = append(allErrors, err)
 		return nil, allErrors
 	}
 	opts, err := rt.EnvOptions(env.TypeProvider())
-	root, ok = rt.FindDeclType(scopedTypeName)
-	if !ok {
-		root = celmodel.SchemaDeclType(schema).MaybeAssignTypeName(scopedTypeName)
+	if err != nil {
+		allErrors = append(allErrors, err)
+		return nil, allErrors
 	}
+	root, ok = rt.FindDeclType(ScopedTypeName)
+	if !ok {
+		root = celmodel.SchemaDeclType(schema).MaybeAssignTypeName(ScopedTypeName)
+	}
+	// if the type is object, will traverse each field in the object tree and declare
 	if root.IsObject() {
 		for k, f := range root.Fields {
 			propDecls = append(propDecls, decls.NewVar(k, f.Type.ExprType()))
 		}
 	}
-	propDecls = append(propDecls, decls.NewVar(scopedTypeName, root.ExprType()))
+	propDecls = append(propDecls, decls.NewVar(ScopedVarName, root.ExprType()))
 	opts = append(opts, cel.Declarations(propDecls...))
 	env, err = env.Extend(opts...)
 	if err != nil {
@@ -80,5 +88,8 @@ func Compile(schema *spec.Schema, celRules CelRules) ([]cel.Program, []error) {
 		}
 	}
 
+	if len(allErrors) > 0 {
+		return nil, allErrors
+	}
 	return programs, allErrors
 }

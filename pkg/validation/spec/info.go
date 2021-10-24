@@ -68,6 +68,27 @@ func (e Extensions) GetStringSlice(key string) ([]string, bool) {
 	return nil, false
 }
 
+// GetValidationRules gets a list of CELValidationRules from the extensions
+func (e Extensions) GetValidationRules(key string) ([]CELValidationRule, bool) {
+	if v, ok := e[strings.ToLower(key)]; ok {
+		celRules, isSlice := v.([]CELValidationRule)
+		if !isSlice {
+			return nil, false
+		}
+		return celRules, ok
+	}
+	return nil, false
+}
+
+// CELValidationRule is used for expression validation.
+// ref: https://github.com/google/cel-spec
+type CELValidationRule struct {
+	// Rule represents the validation rule which will be evaluated by CEL.
+	Rule string
+	// Message represents the message displayed when validation failed.
+	Message string
+}
+
 // VendorExtensible composition block.
 type VendorExtensible struct {
 	Extensions Extensions
