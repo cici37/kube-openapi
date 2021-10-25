@@ -35,9 +35,11 @@ const ScopedVarName = "self"
 // Compile compiles all the CEL validation rules in the CelRules and returns a slice containing a compiled program for each provided CelRule, or an array of errors.
 func Compile(schema *spec.Schema) ([]cel.Program, []error) {
 	var allErrors []error
-	celRules, hasRule := schema.Extensions.GetValidationRules("x-kubernetes-validator")
-	if !hasRule {
-		allErrors = append(allErrors, fmt.Errorf("no validation rule passed"))
+	celRules := spec.CELValidationRules{}
+	err := schema.Extensions.GetObject("x-kubernetes-validator", celRules)
+	//celRules, hasRule := schema.Extensions.GetValidationRules("x-kubernetes-validator")
+	if err != nil {
+		allErrors = append(allErrors, fmt.Errorf("unexpected error accessing x-kubernetes-validator: %v", err.Error()))
 		return nil, allErrors
 	}
 

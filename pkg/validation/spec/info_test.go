@@ -35,7 +35,17 @@ const infoJSON = `{
 		"url": "http://creativecommons.org/licenses/by/4.0/"
 	},
 	"version": "1.0.9-abcd",
-	"x-framework": "go-swagger"
+	"x-framework": "go-swagger",
+   "x-kubernetes-validator": [
+       {
+         "rule": "rule1",
+         "message": "message1"
+       },
+       {
+         "rule": "rule2",
+         "message": "message2"
+       }
+   ]
 }`
 
 var info = Info{
@@ -51,7 +61,10 @@ var info = Info{
 			URL:  "http://creativecommons.org/licenses/by/4.0/",
 		},
 	},
-	VendorExtensible: VendorExtensible{Extensions: map[string]interface{}{"x-framework": "go-swagger"}},
+	VendorExtensible: VendorExtensible{Extensions: map[string]interface{}{"x-framework": "go-swagger", "x-kubernetes-validator": []CELValidationRule{
+		{Rule: "rule1", Message: "message1"},
+		{Rule: "rule2", Message: "message2"},
+	}}},
 }
 
 func TestIntegrationInfo_Serialize(t *testing.T) {
