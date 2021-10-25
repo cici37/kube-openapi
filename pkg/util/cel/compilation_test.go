@@ -373,7 +373,7 @@ func TestCelCompilation(t *testing.T) {
 			expectedErrMessage: "size of scoped field should be equal to 10",
 		},
 		{
-			name: "invalid checking for number",
+			name: "compilation failure",
 			input: spec.Schema{
 				SchemaProps: spec.SchemaProps{
 					Type: []string{"integer"},
@@ -392,6 +392,26 @@ func TestCelCompilation(t *testing.T) {
 			wantError:          true,
 			checkErrorMessage:  true,
 			expectedErrMessage: "compilation failed for rule",
+		},
+		{
+			name: "rule is not specified",
+			input: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Type: []string{"integer"},
+				},
+				VendorExtensible: spec.VendorExtensible{
+					Extensions: spec.Extensions{
+						"x-kubernetes-validator": []spec.CELValidationRule{
+							{
+								Message: "size of scoped field should be equal to 10",
+							},
+						},
+					},
+				},
+			},
+			wantError:          true,
+			checkErrorMessage:  true,
+			expectedErrMessage: "rule is not specified",
 		},
 	}
 

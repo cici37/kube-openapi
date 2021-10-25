@@ -75,6 +75,10 @@ func Compile(schema *spec.Schema) ([]cel.Program, []error) {
 	}
 	programs := make([]cel.Program, len(celRules))
 	for i, rule := range celRules {
+		if rule.Rule == "" {
+			allErrors = append(allErrors, fmt.Errorf("rule is not specified"))
+			return nil, allErrors
+		}
 		ast, issues := env.Compile(rule.Rule)
 		if issues != nil {
 			allErrors = append(allErrors, fmt.Errorf("compilation failed for rule: %v with message: %v", rule.Message, issues.Err()))
